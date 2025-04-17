@@ -35,8 +35,3 @@ const hash = sha256(message);
 console.log(bufferToBase64(hash));
 // Expected: uU0nuZNNPgilLlLX2n2r+sSE7+N6U4DukIj3rOLvzek=
 ```
-
-## Testing
-
-A test.js file is provided to validate each function's correctness.
-```node test.js```
