@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Brownbear security</title>
-  <script src="brownbear.js"></script>
+  <title>Brownbear Security</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -56,9 +55,16 @@
       height: 150px;
     }
   </style>
+
+  <!-- Charger BrownBear Pure JS en module ES et exposer sur window -->
+  <script type="module">
+    import BrownBear from './brownbear.js';
+    window.BrownBear = BrownBear;
+  </script>
 </head>
 <body>
   <h2>ʕ´• ᴥ•̥`ʔ Brownbear Security</h2>
+
   <label for="passphrase">Passphrase:</label>
   <input type="password" id="passphrase" placeholder="Enter your passphrase" />
 
@@ -74,49 +80,54 @@
   <textarea id="result" readonly></textarea>
 
   <script>
+    // Utilitaires de conversion Base64 ↔ ArrayBuffer
     function bufferToBase64(buffer) {
       return btoa(String.fromCharCode(...new Uint8Array(buffer)));
     }
-
     function base64ToBuffer(base64) {
       return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
     }
 
+    // Chiffrement
     async function encryptMessage() {
       const message = document.getElementById('message').value.trim();
       const passphrase = document.getElementById('passphrase').value;
       if (!message || !passphrase) {
-        alert('Please enter both a message and a passphrase.');
+        alert('Entrez un message et une passphrase.');
         return;
       }
       try {
+        // On dérive la clé et récupère le salt
         const salt = await BrownBear.setPassword(passphrase);
         const result = await BrownBear.encrypt(message);
-        const combined = result.salt + ':' + result.iv + ':' + result.data;
+        // On inclut salt, iv, data et tag
+        const combined = [ salt, result.iv, result.data, result.tag ].join(':');
         document.getElementById('result').value = combined;
       } catch (e) {
-        alert('Encryption failed: ' + e.message);
+        alert('Échec chiffrage : ' + e.message);
       }
     }
 
+    // Déchiffrement
     async function decryptMessage() {
       const combined = document.getElementById('message').value.trim();
       const passphrase = document.getElementById('passphrase').value;
       if (!combined || !passphrase) {
-        alert('Please enter both the encrypted message and the passphrase.');
+        alert('Entrez le texte chiffré et la passphrase.');
         return;
       }
       try {
         const parts = combined.split(':');
-        if (parts.length !== 3) {
-          throw new Error('Invalid encrypted message format.');
+        if (parts.length !== 4) {
+          throw new Error('Format invalide, attendu salt:iv:data:tag');
         }
-        const [salt, iv, data] = parts;
+        const [ salt, iv, data, tag ] = parts;
+        // On recharge le même salt pour dériver la clé
         await BrownBear.setPassword(passphrase, salt);
-        const plaintext = await BrownBear.decrypt(data, iv);
+        const plaintext = await BrownBear.decrypt(data, iv, tag);
         document.getElementById('result').value = plaintext;
       } catch (e) {
-        alert('Decryption failed: ' + e.message);
+        alert('Échec déchiffrage : ' + e.message);
       }
     }
   </script>
