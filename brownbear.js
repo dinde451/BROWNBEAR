@@ -1,11 +1,16 @@
-//<(---- 1. CRYPTOGRAPHIC UTILITIES ----)>
+//Brownbear security ʕ´• ᴥ•̥`ʔ
+//API/Lib free, pure JS
+//2025
 
-// 1.1 ROTR
+//<(---- 1. BROWNBEAR CRYPTOGRAPHIC ----)>
+
+// 1.1 ROTR ʕ´• ᴥ•̥`ʔ
+//https://nvlpubs.nist.gov/nistpubs/fips/nist.fips.180-4.pdf?utm_source=chatgpt.com
 function ROTR(x, n) {
   return (x >>> n) | (x << (32 - n));
 }
 
-// 1.2 SHA-256 (FIPS 180-4)
+// 1.2 SHA-256 (FIPS 180-4) ʕ´• ᴥ•̥`ʔ
 function sha256(bytes) {
   const K = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b,
@@ -69,7 +74,7 @@ function sha256(bytes) {
   return hash;
 }
 
-// 1.3 HMAC-SHA256
+// 1.3 HMAC-SHA256 ʕ´• ᴥ•̥`ʔ
 function hmacSha256(key, message) {
   let keyBytes = key;
   if (typeof key === 'string') keyBytes = new TextEncoder().encode(key);
@@ -90,16 +95,19 @@ function hmacSha256(key, message) {
   return sha256(concatBuffers(oKeyPad, innerHash));
 }
 
-// 1.4 concatBuffers
+// 1.4 concatBuffers ʕ´• ᴥ•̥`ʔ
 function concatBuffers(...buffers) {
   const total = buffers.reduce((sum, b) => sum + b.length, 0);
   const result = new Uint8Array(total);
   let offset = 0;
-  buffers.forEach(b => { result.set(b, offset); offset += b.length; });
+  for (const b of buffers) {
+    result.set(b, offset);
+    offset += b.length;
+  }
   return result;
 }
 
-// 1.5 Base64 utils
+// 1.5 Base64 utils ʕ´• ᴥ•̥`ʔ
 function bufferToBase64(buf) {
   let binary = '';
   const bytes = new Uint8Array(buf);
@@ -129,12 +137,15 @@ async function pbkdf2(passphrase, salt, iterations, dkLen) {
       for (let k = 0; k < HLen; k++) T[k] ^= U[k];
     }
     DK.set(T, (i - 1) * HLen);
+    zeroize(U);
+    zeroize(T);
+    zeroize(passphrase);
   }
   return DK.slice(0, dkLen);
 }
 
 //<(---- 3. AES-256 (FIPS 197) ----)>
-// 3.1 Key schedule
+// 3.1 Key schedule ʕ´• ᴥ•̥`ʔ
 // AES-256 Key Schedule
 function aesKeySchedule(keyBytes) {
   const Nk = 8, Nb = 4, Nr = 14;
@@ -143,7 +154,7 @@ function aesKeySchedule(keyBytes) {
     0x10000000, 0x20000000, 0x40000000, 0x80000000,
     0x1b000000, 0x36000000, 0x6c000000, 0xd8000000,
     0xab000000, 0x4d000000, 0x9a000000
-  ];  
+  ];
 
   const W = new Uint32Array(Nb * (Nr + 1));
   const dv = new DataView(keyBytes.buffer, keyBytes.byteOffset, keyBytes.byteLength);
@@ -191,7 +202,7 @@ const SBOX = new Uint8Array([
   0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 ]);
 
-// 3.2 AES block operations
+// 3.2 AES block operations ʕ´• ᴥ•̥`ʔ
 function addRoundKey(state, roundKeyWords) {
   for (let i = 0; i < 4; i++) {
     const word = roundKeyWords[i];
@@ -226,7 +237,7 @@ function mixColumns(s) {
       a[j] = s[col + j];
       b[j] = xtime(a[j]);
     }
-    s[col]     = b[0] ^ a[1] ^ b[1] ^ a[2] ^ a[3];
+    s[col] = b[0] ^ a[1] ^ b[1] ^ a[2] ^ a[3];
     s[col + 1] = a[0] ^ b[1] ^ a[2] ^ b[2] ^ a[3];
     s[col + 2] = a[0] ^ a[1] ^ b[2] ^ a[3] ^ b[3];
     s[col + 3] = a[0] ^ b[0] ^ a[1] ^ a[2] ^ b[3];
@@ -235,6 +246,8 @@ function mixColumns(s) {
 
 function aesEncryptBlock(input, W) {
   if (input.length !== 16 || W.length !== 60) {
+    zeroize(input);
+    zeroize(W);
     throw new Error("Input must be 16 bytes and W must contain 60 words (AES-256 key schedule).");
   }
 
@@ -310,27 +323,34 @@ function to64bit(x) {
 }
 
 function aesGcmEncrypt(key, plaintext, aad = new Uint8Array()) {
+  const maxBlocks = 0xFFFFFFFF - 1; // per spec
+  if (Math.ceil(plaintext.length / 16) > maxBlocks) {
+    throw new Error("Plaintext too long for AES-GCM with 96-bit IV");
+  }
+
+  const schedule = aesKeySchedule(key);
   const iv = randomBytes(12);
-  const H = aesEncryptBlock(new Uint8Array(16), aesKeySchedule(key));
+  const H = aesEncryptBlock(new Uint8Array(16), schedule);
   const J0 = new Uint8Array(16);
   J0.set(iv);
   J0[15] = 1;
 
   const C = new Uint8Array(plaintext.length);
-  plaintext.forEach((_, i) => {
+  for (let i = 0; i < plaintext.length; i++) {
     const ctr = J0.slice();
     new DataView(ctr.buffer).setUint32(12, Math.floor(i / 16) + 1);
-    const S = aesEncryptBlock(ctr, aesKeySchedule(key));
+    const S = aesEncryptBlock(ctr, schedule);
     C[i] = plaintext[i] ^ S[i % 16];
-  });
+  }
 
-  const tagMask = aesEncryptBlock(J0, aesKeySchedule(key));
+  const tagMask = aesEncryptBlock(J0, schedule);
   const tag = xor16(tagMask, ghash(H, aad, C));
   return { iv, ciphertext: C, tag };
 }
 
 function aesGcmDecrypt(key, ciphertext, iv, aad = new Uint8Array(), tag) {
-  const H = aesEncryptBlock(new Uint8Array(16), aesKeySchedule(key));
+  const schedule = aesKeySchedule(key);
+  const H = aesEncryptBlock(new Uint8Array(16), schedule);
   const J0 = new Uint8Array(16);
   J0.set(iv); J0[15] = 1;
 
@@ -338,20 +358,123 @@ function aesGcmDecrypt(key, ciphertext, iv, aad = new Uint8Array(), tag) {
   ciphertext.forEach((_, i) => {
     const ctr = J0.slice();
     new DataView(ctr.buffer).setUint32(12, Math.floor(i / 16) + 1);
-    const S = aesEncryptBlock(ctr, aesKeySchedule(key));
+    const S = aesEncryptBlock(ctr, schedule);
     P[i] = ciphertext[i] ^ S[i % 16];
   });
 
   const tagMask = aesEncryptBlock(J0, aesKeySchedule(key));
   const computedTag = xor16(tagMask, ghash(H, aad, ciphertext));
-  const valid = computedTag.every((b, i) => b === tag[i]);
+  //computedTag.every((b, i) => b === tag[i]) can be shorted early-exit. It is better to compare in constant time
+  let valid = 0;
+  for (let i = 0; i < tag.length; i++) valid |= computedTag[i] ^ tag[i];
+  valid = (valid === 0);
   return { plaintext: P, valid };
 }
 
+// 4.1 Pseudo-random (HMAC-DRBG) ʕ´• ᴥ•̥`ʔ
+//https://stackoverflow.com/questions/5651789/is-math-random-cryptographically-secure
+// Global entropy pool
+let entropyPool = [];
+
+// DRBG internal state
+let drbgKey = null;
+let drbgV = null;
+
+// Reseed controls
+const RESEED_THRESHOLD = 128;        // min entropy-events before we reseed
+const MIN_RESEED_INTERVAL = 1000;    // ms between reseeds
+let lastReseedTime = 0;
+
+// Collect entropy from mouse movements
+window.addEventListener('mousemove', e => {
+  entropyPool.push(e.screenX ^ e.screenY ^ Date.now());
+  trimEntropy();
+});
+// Collect entropy from keyboard timing
+let lastKeyTime = Date.now();
+window.addEventListener('keydown', () => {
+  const now = Date.now();
+  entropyPool.push(now - lastKeyTime);
+  lastKeyTime = now;
+  trimEntropy();
+});
+// Keep the pool bounded
+function trimEntropy() {
+  if (entropyPool.length > 1024) {
+    entropyPool = entropyPool.slice(-1024);
+  }
+}
+
+// Zeroize a Uint8Array (wipe sensitive data)
+function zeroize(buf) {
+  if (buf instanceof Uint8Array) buf.fill(0);
+}
+
+// --- HMAC-DRBG helpers ---
+// Update drbgKey & drbgV with optional seed
+function updateDRBG(seedBytes) {
+  drbgKey = hmacSha256(drbgKey, concatBuffers(drbgV, new Uint8Array([0x00]), seedBytes));
+  drbgV = hmacSha256(drbgKey, drbgV);
+  if (seedBytes.length) {
+    drbgKey = hmacSha256(drbgKey, concatBuffers(drbgV, new Uint8Array([0x01]), seedBytes));
+    drbgV = hmacSha256(drbgKey, drbgV);
+  }
+}
+
+// Generate len bytes via HMAC-DRBG
+function drbgGenerate(len) {
+  const out = new Uint8Array(len);
+  let generated = 0;
+  while (generated < len) {
+    drbgV = hmacSha256(drbgKey, drbgV);
+    const chunk = drbgV.subarray(0, Math.min(len - generated, drbgV.length));
+    out.set(chunk, generated);
+    generated += chunk.length;
+  }
+  // Post-update for forward security
+  updateDRBG(new Uint8Array());
+  return out;
+}
+
+// Fold entropyPool into 32 bytes via your SHA-256
+function foldEntropyPool() {
+  const text = entropyPool.join(',');
+  const data = new TextEncoder().encode(text);
+  return sha256(data);
+}
+
+// Reseed DRBG: zeroize old state, then init+update with new seed
+function reseedDRBG() {
+  // wipe old state
+  zeroize(drbgKey);
+  zeroize(drbgV);
+
+  // fold collected events into seed
+  const seed = foldEntropyPool();
+
+  // init state
+  drbgKey = new Uint8Array(32).fill(0);
+  drbgV = new Uint8Array(32).fill(1);
+
+  updateDRBG(seed);
+
+  // clear pool and record time
+  entropyPool = [];
+  lastReseedTime = Date.now();
+}
+
+// Public API unchanged
 function randomBytes(len) {
-  const r = new Uint8Array(len);
-  for (let i = 0; i < len; i++) r[i] = Math.floor(Math.random() * 256);
-  return r;
+  const now = Date.now();
+  // reseed on first use, or if enough events AND enough time has passed
+  if (
+    !drbgKey ||
+    (entropyPool.length >= RESEED_THRESHOLD &&
+      (now - lastReseedTime) >= MIN_RESEED_INTERVAL)
+  ) {
+    reseedDRBG();
+  }
+  return drbgGenerate(len);
 }
 
 //<(---- 5. MODULE BrownBear ----)>
@@ -362,6 +485,7 @@ const BrownBear = {
   async setPassword(pass, customSalt) {
     _salt = customSalt ? base64ToBuffer(customSalt) : randomBytes(16);
     _keyBytes = await pbkdf2(pass, _salt, 100000, 32);
+    zeroize(pass);
     return bufferToBase64(_salt);
   },
   async encrypt(plaintext) {
@@ -381,7 +505,11 @@ const BrownBear = {
     const iv = base64ToBuffer(ivB64);
     const tag = base64ToBuffer(tagB64);
     const { plaintext, valid } = aesGcmDecrypt(_keyBytes, C, iv, new Uint8Array(), tag);
-    if (!valid) throw new Error('Authentication failed');
+    if (!valid) {
+      zeroize(U);
+      zeroize(T);
+      throw new Error('Authentication failed');
+    }
     return new TextDecoder().decode(plaintext);
   }
 };
@@ -389,6 +517,6 @@ const key = new Uint8Array(32);
 const input = new Uint8Array(16);
 const expandedKey = aesKeySchedule(key);
 const encrypted = aesEncryptBlock(input, expandedKey);
-console.log("Chiffré :", Array.from(encrypted).map(b => b.toString(16).padStart(2, '0')).join(' '));
+console.log("Code :", Array.from(encrypted).map(b => b.toString(16).padStart(2, '0')).join(' '));
 
 export default BrownBear;
