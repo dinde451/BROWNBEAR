@@ -2,10 +2,13 @@
 //API/Lib free, pure JS
 //2025
 
+//Pourquoi pas WebCrypto ?
+//Le module BrownBear est conçu pour fonctionner dans des environnements restreints, isolés ou audités où l’usage d’APIs natives n’est pas autorisé ou souhaité.
+//Il repose sur un générateur pseudo-aléatoire déterministe (HMAC-DRBG), alimenté par l’utilisateur à partir de sources d'entropie passives et actives (mouvement, clavier, temps), sans dépendre d’aucune API cryptographique ou système.
+
 //<(---- 1. BROWNBEAR CRYPTOGRAPHIC ----)>
 
 // 1.1 ROTR ʕ´• ᴥ•̥`ʔ
-//https://nvlpubs.nist.gov/nistpubs/fips/nist.fips.180-4.pdf?utm_source=chatgpt.com
 function ROTR(x, n) {
   return (x >>> n) | (x << (32 - n));
 }
@@ -139,7 +142,7 @@ async function pbkdf2(passphrase, salt, iterations, dkLen) {
     DK.set(T, (i - 1) * HLen);
     zeroize(U);
     zeroize(T);
-    zeroize(passphrase);
+    zeroize(pass);
   }
   return DK.slice(0, dkLen);
 }
@@ -365,9 +368,7 @@ function aesGcmDecrypt(key, ciphertext, iv, aad = new Uint8Array(), tag) {
   const tagMask = aesEncryptBlock(J0, aesKeySchedule(key));
   const computedTag = xor16(tagMask, ghash(H, aad, ciphertext));
   //computedTag.every((b, i) => b === tag[i]) can be shorted early-exit. It is better to compare in constant time
-  let valid = 0;
-  for (let i = 0; i < tag.length; i++) valid |= computedTag[i] ^ tag[i];
-  valid = (valid === 0);
+  const valid = constantTimeEqual(computedTag, tag);
   return { plaintext: P, valid };
 }
 
@@ -404,7 +405,6 @@ function trimEntropy() {
     entropyPool = entropyPool.slice(-1024);
   }
 }
-
 // Zeroize a Uint8Array (wipe sensitive data)
 function zeroize(buf) {
   if (buf instanceof Uint8Array) buf.fill(0);
@@ -477,6 +477,16 @@ function randomBytes(len) {
   return drbgGenerate(len);
 }
 
+//Une comparaison naïve avec === ou .every(...) peut être vulnérable à une attaque temporelle si l'exécution varie selon les octets corrects.
+function constantTimeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a[i] ^ b[i];
+  }
+  return diff === 0;
+}
+
 //<(---- 5. MODULE BrownBear ----)>
 let _keyBytes = null;
 let _salt = null;
@@ -484,11 +494,12 @@ let _salt = null;
 const BrownBear = {
   async setPassword(pass, customSalt) {
     _salt = customSalt ? base64ToBuffer(customSalt) : randomBytes(16);
-    _keyBytes = await pbkdf2(pass, _salt, 100000, 32);
-    zeroize(pass);
-    return bufferToBase64(_salt);
+    _keyBytes = await pbkdf2(pass, _salt, 500000, 32);
+    const out = bufferToBase64(_salt);
+	zeroize(_keyBytes);
+	return out;
   },
-  async encrypt(plaintext) {
+  encrypt(plaintext) {
     if (!_keyBytes) throw new Error('Password not set');
     const pt = new TextEncoder().encode(plaintext);
     const { iv, ciphertext, tag } = aesGcmEncrypt(_keyBytes, pt);
@@ -499,15 +510,15 @@ const BrownBear = {
       salt: bufferToBase64(_salt)
     };
   },
-  async decrypt(dataB64, ivB64, tagB64) {
+  decrypt(dataB64, ivB64, tagB64) {
     if (!_keyBytes) throw new Error('Password not set');
     const C = base64ToBuffer(dataB64);
     const iv = base64ToBuffer(ivB64);
     const tag = base64ToBuffer(tagB64);
     const { plaintext, valid } = aesGcmDecrypt(_keyBytes, C, iv, new Uint8Array(), tag);
     if (!valid) {
-      zeroize(U);
-      zeroize(T);
+      zeroize(C);
+      zeroize(plaintext);
       throw new Error('Authentication failed');
     }
     return new TextDecoder().decode(plaintext);
@@ -517,6 +528,5 @@ const key = new Uint8Array(32);
 const input = new Uint8Array(16);
 const expandedKey = aesKeySchedule(key);
 const encrypted = aesEncryptBlock(input, expandedKey);
-console.log("Code :", Array.from(encrypted).map(b => b.toString(16).padStart(2, '0')).join(' '));
 
 export default BrownBear;
