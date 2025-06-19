@@ -2,7 +2,7 @@
 /*!
  * BrownBear Security Module v2.0
  * Author: 1C6
- * License: MIT
+ * License: Apache License 2.0
  * No dependencies. No WebCrypto. Pure JS.
  * For air-gapped and auditable environments.
  * 🧸 Built with fear, for liberty and auditability.
