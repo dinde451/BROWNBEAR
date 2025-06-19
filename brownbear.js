@@ -1,11 +1,13 @@
 //Brownbear security ʕ´• ᴥ•̥`ʔ
-//API/Lib free, pure JS
-//2025
-
-//Pourquoi pas WebCrypto ?
-//Le module BrownBear est conçu pour fonctionner dans des environnements restreints, isolés ou audités où l’usage d’APIs natives n’est pas autorisé ou souhaité.
-//Il repose sur un générateur pseudo-aléatoire déterministe (HMAC-DRBG), alimenté par l’utilisateur à partir de sources d'entropie passives et actives (mouvement, clavier, temps), sans dépendre d’aucune API cryptographique ou système.
-
+/*!
+ * BrownBear Security Module v2.0
+ * Author: 1C6
+ * License: MIT
+ * No dependencies. No WebCrypto. Pure JS.
+ * For air-gapped and auditable environments.
+ * 🧸 Built with fear, for liberty and auditability.
+ */
+ 
 //<(---- 1. BROWNBEAR CRYPTOGRAPHIC ----)>
 
 // 1.1 ROTR ʕ´• ᴥ•̥`ʔ
