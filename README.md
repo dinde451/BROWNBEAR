@@ -9,7 +9,7 @@
 
 BrownBear is a standalone, pure JavaScript cryptographic library built to operate in restricted, air-gapped, or audited environments where native cryptographic APIs (e.g., WebCrypto or Node's `crypto`) are either not trusted or unavailable. It implements fully auditable and reproducible cryptographic primitives.
 
-Designed with military- and government-grade constraints in mind, BrownBear prioritizes:
+BrownBear prioritizes:
 
 - Deterministic entropy collection
 - Verifiable algorithmic correctness
