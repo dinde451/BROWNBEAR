@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Brownbear Security</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #140e06;
+      padding: 40px;
+      max-width: 700px;
+      margin: auto;
+      color: #9e9968;
+    }
+    h2 {
+      text-align: center;
+      color: #4CAF50;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 20px;
+    }
+    input[type="password"], textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #cccccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 1em;
+    }
+    textarea {
+      resize: vertical;
+    }
+    .button-group {
+      margin-top: 20px;
+      text-align: center;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 12px 25px;
+      margin: 5px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #result {
+      margin-top: 20px;
+      height: 150px;
+    }
+  </style>
+
+  <!-- Charger BrownBear Pure JS en module ES et exposer sur window -->
+  <script type="module">
+    import BrownBear from './brownbear.js';
+    window.BrownBear = BrownBear;
+  </script>
+</head>
+<body>
+  <h2>ʕ´• ᴥ•̥`ʔ Brownbear Security</h2>
+
+  <label for="passphrase">Passphrase:</label>
+  <input type="password" id="passphrase" placeholder="Enter your passphrase" />
+
+  <label for="message">Message:</label>
+  <textarea id="message" rows="6" placeholder="Type your message or paste encrypted text here"></textarea>
+
+  <div class="button-group">
+    <button onclick="encryptMessage()">Encrypt</button>
+    <button onclick="decryptMessage()">Decrypt</button>
+  </div>
+
+  <label for="result">Result:</label>
+  <textarea id="result" readonly></textarea>
+
+  <script>
+    // Utilitaires de conversion Base64 ↔ ArrayBuffer
+    function bufferToBase64(buffer) {
+      return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+    }
+    function base64ToBuffer(base64) {
+      return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    }
+
+    // Chiffrement
+    async function encryptMessage() {
+      const message = document.getElementById('message').value.trim();
+      const passphrase = document.getElementById('passphrase').value;
+      if (!message || !passphrase) {
+        alert('Entrez un message et une passphrase.');
+        return;
+      }
+      try {
+        // On dérive la clé et récupère le salt
+        const salt = await BrownBear.setPassword(passphrase);
+        const result = await BrownBear.encrypt(message);
+        // On inclut salt, iv, data et tag
+        const combined = [ salt, result.iv, result.data, result.tag ].join(':');
+        document.getElementById('result').value = combined;
+      } catch (e) {
+        alert('Échec chiffrage : ' + e.message);
+      }
+    }
+
+    // Déchiffrement
+    async function decryptMessage() {
+      const combined = document.getElementById('message').value.trim();
+      const passphrase = document.getElementById('passphrase').value;
+      if (!combined || !passphrase) {
+        alert('Entrez le texte chiffré et la passphrase.');
+        return;
+      }
+      try {
+        const parts = combined.split(':');
+        if (parts.length !== 4) {
+          throw new Error('Format invalide, attendu salt:iv:data:tag');
+        }
+        const [ salt, iv, data, tag ] = parts;
+        // On recharge le même salt pour dériver la clé
+        await BrownBear.setPassword(passphrase, salt);
+        const plaintext = await BrownBear.decrypt(data, iv, tag);
+        document.getElementById('result').value = plaintext;
+      } catch (e) {
+        alert('Échec déchiffrage : ' + e.message);
+      }
+    }
+  </script>
+</body>
+</html>
