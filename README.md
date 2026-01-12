@@ -1,12 +1,11 @@
 # BrownBear Cryptographic Module
 
 **Version:** 1.0 — 2025\
-**Author:** 1C6\
 **Environment:** Web-based / API-less / No WebCrypto
 
 ---
 
-## 🛡️ Overview
+## Overview
 
 BrownBear is a standalone, pure JavaScript cryptographic library built to operate in restricted, air-gapped, or audited environments where native cryptographic APIs (e.g., WebCrypto or Node's `crypto`) are either not trusted or unavailable. It implements fully auditable and reproducible cryptographic primitives.
 
@@ -19,7 +18,7 @@ Designed with military- and government-grade constraints in mind, BrownBear prio
 
 ---
 
-## 🔐 Justification of Design Choices
+## Justification of Design Choices
 
 ### 1. No WebCrypto API
 
@@ -112,7 +111,7 @@ Designed with military- and government-grade constraints in mind, BrownBear prio
 
 ---
 
-## 🧪 Test Coverage Summary
+## Test Coverage Summary
 
 All primitives are validated against NIST vectors or internal consistency checks.
 
@@ -128,7 +127,7 @@ All primitives are validated against NIST vectors or internal consistency checks
 
 ---
 
-## 📄 Usage Notes
+## Usage Notes
 
 ### Initialization
 
@@ -150,7 +149,7 @@ const message = BrownBear.decrypt(data, iv, tag);
 
 ---
 
-## ⛓️ Known Limitations
+## Known Limitations
 
 - No hardware acceleration (expected in JS-only environments).
 - No forward secrecy (no ephemeral key exchange protocol like DH/ECDH).
@@ -158,7 +157,7 @@ const message = BrownBear.decrypt(data, iv, tag);
 
 ---
 
-## 🛠️ Recommendations
+## Recommendations
 
 - For ultra-secure deployments, pair BrownBear with physical entropy sources (e.g., USB TRNG).
 - Use over HTTPS even if encryption is local, to prevent MITM of script delivery.
@@ -166,7 +165,7 @@ const message = BrownBear.decrypt(data, iv, tag);
 
 ---
 
-## 📚 References
+## References
 
 - [FIPS 180-4: SHA-2 Standard](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf)
 - [FIPS 197: AES](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.197.pdf)
